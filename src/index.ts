@@ -56,6 +56,8 @@ function accessHelper(store, getState) {
       if (current && typeof current === 'object') {
         map.set(current, [...path, key])
         return new Proxy(current, handler)
+      } else if (typeof current === 'function') {
+        return current.bind(store)
       } else {
         return current
       }
@@ -70,7 +72,7 @@ function accessHelper(store, getState) {
           return Reflect.set(state, key, value)
         }
       }
-      return Reflect.set(target, key, value)
+      return true
     },
   }
   // 在set属性值时，即便不改变目标对象上的属性，也会校验目标上的对应属性是否可写
