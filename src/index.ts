@@ -6,10 +6,10 @@ type ActionHandler<A> = {
     : never
 }
 
-// type Getters<S extends Obj> = Record<
-//   string,
-//   ((state: S) => any) | ((...args: any[]) => any)
-// >
+type Getters<S extends Obj> = Record<
+  string,
+  ((state: S) => any) | ((...args: any[]) => any)
+>
 
 export type GetterRes<G> = {
   readonly [k in keyof G]: G[k] extends (...args: any[]) => infer R ? R : G[k]
@@ -37,11 +37,6 @@ type Subscibe = {
 
 function getValueOfPath(target, path: string[]) {
   return path.reduce((result, key) => result[key], target)
-  // let result
-  // for (const key of path) {
-  //   result = target[key]
-  // }
-  // return result
 }
 type ChangeRecord = { path: string[]; value: any }
 
@@ -70,6 +65,8 @@ function accessHelper(store, getState) {
         const state = getState()
         if (target === store && Reflect.has(state, key)) {
           return Reflect.set(state, key, value)
+        } else {
+          return Reflect.set(target, key, value)
         }
       }
       return true
@@ -83,7 +80,7 @@ function accessHelper(store, getState) {
       !args.length && args.push(context)
       const result = Reflect.apply(action, context, args)
       if (changes.size) callback(changes)
-      if (result?.then) {
+      if (result && result.then) {
         result.then(() => {
           if (changes.size) callback(changes)
           changes.clear()
@@ -165,7 +162,7 @@ class BaseStore<S extends Obj = Obj> {
     for (const [key, sub] of this.#getterSubscriber) {
       if (!sub.deps.length) continue
       for (const dep of sub.deps) {
-        const isDep = !!changePaths.find((path) => path.startsWith(dep))
+        const isDep = !!changePaths.find((path) => dep.startsWith(path)) // TODO：依赖的父元素改变，还需要对依赖的元素进行比较
         if (isDep) {
           const result = sub.updater()
           changes.set(key, result)
@@ -199,7 +196,7 @@ class BaseStore<S extends Obj = Obj> {
     for (const sub of this.#subscribers) {
       if (sub.deps.length) {
         for (const dep of sub.deps) {
-          const isDep = !!changePaths.find((path) => path.startsWith(dep))
+          const isDep = !!changePaths.find((path) => dep.startsWith(path)) // TODO：依赖的父元素改变，还需要对依赖的元素进行比较
           if (isDep) {
             sub.updater(changes)
             break
@@ -219,7 +216,7 @@ class BaseStore<S extends Obj = Obj> {
   /** 收集getter方法依赖，并返回一个定阅 */
   #getterSubs(getter: Fn, key: string) {
     const { proxy, paths, otherDepend } = this.#collector
-    const { deps } = Reflect.apply(getter, proxy, [])
+    Reflect.apply(getter, proxy, [])
     const notify = {
       deps: [...paths],
       result: undefined as any,
@@ -235,7 +232,7 @@ class BaseStore<S extends Obj = Obj> {
             notify.updater()
             const changes = new Map()
             for (const [path, val] of _changes) {
-              if (!deps.size || deps.has(path))
+              if (!otherDeps.size || otherDeps.has(path))
                 changes.set(key + ',' + path, val)
             }
             this.#updater(changes)
@@ -249,7 +246,7 @@ class BaseStore<S extends Obj = Obj> {
   $subscribe(updater: Fn, selector?: Fn) {
     const { proxy, paths } = this.#collector
     paths.clear()
-    selector?.(proxy)
+    selector && selector(proxy)
     const sub = {
       deps: [...paths],
       updater,
@@ -293,52 +290,37 @@ class BaseStore<S extends Obj = Obj> {
     this.#state = newState
   }
 }
-type ModelConfig = {
-  state: Obj
-  getters?: Obj
-  actions?: Obj
-}
-function createModel<Opt extends ModelConfig>(config: Opt, updater?: Fn) {
-  const Store = BaseStore as IStore<Opt>
-  return new Store(config, updater)
-  // return new BaseStore(config, updater) as BaseStore<Opt['state']> &
-  //   Opt['state'] &
-  //   GetterRes<Opt['getters']> &
-  //   Opt['actions']
-}
-// const d = defineStore({
-//   state: {
-//     count: 0
-//   },
-//   getters: {
-//     bb() {
-//       return 'a'
-//     }
-//   },
-//   actions: {
-//     do() {
-//       return this
-//     }
-//   }
-// })
+// type ModelConfig = {
+//   state: Obj
+//   getters?: Obj
+//   actions?: Obj
+// }
+// function createModel<Opt extends ModelConfig>(config: Opt, updater?: Fn) {
+//   const Store = BaseStore as IStore<Opt>
+//   return new Store(config, updater)
+//   // return new BaseStore(config, updater) as BaseStore<Opt['state']> &
+//   //   Opt['state'] &
+//   //   GetterRes<Opt['getters']> &
+//   //   Opt['actions']
+// }
 
 export function defineModel<S = Obj, G = Obj, A = Obj>(
   config: ModelOptions<S, G, A>
 ) {
-  const { state: _state, actions, getters } = config
+  const { state: _state } = config
   const state: S = typeof _state === 'function' ? (_state as any)() : _state
 
   function useModel(initState?: Partial<S>) {
     const [_, forceUpdate] = useReducer((d) => d + 1, 0)
     const model = useMemo(() => {
-      return createModel(
+      // return createModel(
+      //   { ...config, state: { ...state, ...initState } },
+      //   forceUpdate
+      // )
+      return new BaseStore(
         { ...config, state: { ...state, ...initState } },
         forceUpdate
-      )
-      // return new BaseStore(
-      //   { ...config,  },
-      //   forceUpdate
-      // ) as ActionHandler<A> & BaseStore<S> & S
+      ) as ActionHandler<A> & BaseStore<S> & S & GetterRes<G>
     }, [])
     // TODO: 清除异步action
     return model
@@ -352,11 +334,11 @@ export function defineStore<S = Obj, G = Obj, A = Obj>(
   const { state: _state } = config
   const state: S = typeof _state === 'function' ? (_state as any)() : _state
 
-  return createModel({ ...config, state })
-  // const store = new BaseStore({ ...config, state }) as ActionHandler<A> &
-  //   BaseStore<S> &
-  //   S &
-  //   GetterRes<G>
+  // return createModel({ ...config, state })
+  const store = new BaseStore({ ...config, state }) as ActionHandler<A> &
+    BaseStore<S> &
+    S &
+    GetterRes<G>
 
   // const useStore = <T extends (model: typeof store) => any>(
   //   selector?: T
@@ -372,7 +354,7 @@ export function defineStore<S = Obj, G = Obj, A = Obj>(
   //   return model
   // }
 
-  // return store
+  return store
 }
 
 export function useStore<S extends BaseStore, F extends (store: S) => any>(
@@ -380,7 +362,7 @@ export function useStore<S extends BaseStore, F extends (store: S) => any>(
   selector?: F
 ) {
   const [_, forceUpdate] = useReducer((d) => d + 1, 0)
-  const model = selector ? selector(store) : store
+  const model = useMemo(() => (selector ? selector(store) : store), [_])
 
   useEffect(() => {
     const unSubscribe = store.$subscribe(forceUpdate, selector)
@@ -438,33 +420,3 @@ function getCollectProxy(ctx) {
 //     return stateProxy
 //   }
 // }
-/** selector, getters 依赖收集 */
-// function createCollector(store) {
-//   const { proxy, paths, otherDepend } = getCollectProxy(store)
-//   const getDeps = (selector?: Fn, key?: string) => {
-//     paths.clear()
-//     const result = selector?.(proxy)
-//     if (otherDepend.size) {
-//       for (const [otherStore, deps] of otherDepend) {
-//         otherStore._subscribers.add({
-//           deps: [...deps],
-//           updater(_changes) {
-//             selector?.(store)
-//             const changes = new Map()
-//             for (const [path, val] of _changes) {
-//               if (!deps.size || deps.has(path))
-//                 changes.set(key + ',' + path, val)
-//             }
-//             store.forceUpdate(changes)
-//           },
-//         })
-//       }
-//     }
-//     return {
-//       result,
-//       deps: [...paths],
-//     }
-//   }
-//   return getDeps
-// }
-// function collector(store, selector?: Fn, key?: string) {}
