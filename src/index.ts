@@ -2,8 +2,8 @@ import { useEffect, useMemo, useReducer } from 'react'
 
 type ActionHandler<A> = {
   [k in keyof A]: A[k] extends (...args: infer P) => infer R
-    ? (...args: P) => R
-    : never
+  ? (...args: P) => R
+  : never
 }
 
 type Getters<S extends Obj> = Record<
@@ -21,12 +21,12 @@ type ModelOptions<S, G, A> = {
   name?: string
   state: S | (() => S)
   getters?: G &
-    ThisType<
-      S &
-        GetterRes<G> & {
-          $depend: <B extends Obj>(store: B) => ReturnType<B['getState']>
-        }
-    > // & Getters<S>
+  ThisType<
+    S &
+    GetterRes<G> & {
+      $depend: <B extends Obj>(store: B) => ReturnType<B['getState']>
+    }
+  > // & Getters<S>
   actions?: A & ThisType<ActionHandler<A> & BaseStore<S> & S & GetterRes<G>>
 }
 type Subscibe = {
@@ -82,23 +82,23 @@ function accessHelper(store, getState) {
   const context = new Proxy({ store }, handler)
   const accessor =
     (action, callback) =>
-    (...args) => {
-      !args.length && args.push(context)
-      const result = Reflect.apply(action, context, args)
-      if (changes.size) callback(changes)
-      if (result && result.then) {
-        result.then(() => {
-          if (changes.size) callback(changes)
-          changes.clear()
-        })
+      (...args) => {
+        !args.length && args.push(context)
+        const result = Reflect.apply(action, context, args)
+        if (changes.size) callback(changes)
+        if (result && result.then) {
+          result.then(() => {
+            if (changes.size) callback(changes)
+            changes.clear()
+          })
+        }
+        changes.clear()
+        return result
       }
-      changes.clear()
-      return result
-    }
   return accessor
 }
 interface IStore<Opt extends Obj> extends BaseStore<Opt['state']> {
-  new (config: Opt, updater?: Fn): BaseStore<Opt['state']> &
+  new(config: Opt, updater?: Fn): BaseStore<Opt['state']> &
     Opt['state'] &
     GetterRes<Opt['getters']> &
     Opt['actions']
@@ -329,6 +329,49 @@ class BaseStore<S extends Obj = Obj> {
 //   //   GetterRes<Opt['getters']> &
 //   //   Opt['actions']
 // }
+
+function createInstance({ state, actions = {}, getters = {} }) {
+  const __state = typeof state === 'function' ? state() : state
+  const instance = {}
+  const readonlyState = {}
+
+  Object.keys(__state).forEach((key) => {
+    const property = {
+      enumerable: true,
+      get: () => __state[key],
+    }
+    Object.defineProperty(readonlyState, key, property)
+    Object.defineProperty(instance, key, property)
+  })
+
+  // 映射 getters
+  const getterSubscriber = new Map()
+  Object.keys(getters).forEach((key) => {
+    Object.defineProperty(instance, key, {
+      enumerable: true,
+      get: () => {
+        if (!getterSubscriber.has(key)) {
+          const sub = this.#getterSubs(getters[key], key)
+          this.#getterSubscriber.set(key, sub)
+          sub.updater()
+        }
+        return getterSubscriber.get(key).result
+      },
+    })
+  })
+
+  // 映射actions
+  // const accessor = accessHelper(this, () => this.#state)
+  Object.keys(actions).forEach((key) => {
+    // this[key] = accessor(actions[key], actionCallback)
+    Object.defineProperty(this, key, {
+      value: this.#accessor(actions[key], (change) =>
+        this.#actionCallback(change, key)
+      ),
+    })
+  })
+}
+
 
 export function defineModel<S = Obj, G = Obj, A = Obj>(
   config: ModelOptions<S, G, A>
