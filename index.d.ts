@@ -49,44 +49,31 @@ declare class BaseStore<S extends Obj = Obj> {
   setState(setter: (state: S) => void): void
   private produce
 }
+
 export declare function defineModel<S = Obj, G = Obj, A = Obj>(
   config: ModelOptions<S, G, A>
-): (initState?: Partial<S> | undefined) => BaseStore<S & {}> &
+): (
+  initState?: Partial<S> | undefined
+) => BaseStore<S & {}> & S & GetterRes<G> & A
+
+type RObj<T> = keyof T extends never ? never : T
+
+type Store<S, G, A> = ActionHandler<A> &
+  BaseStore<S> &
   S &
-  GetterRes<
-    G &
-      ThisType<
-        S &
-          GetterRes<G> & {
-            $depend: <B extends Record<string, any>>(
-              store: B
-            ) => ReturnType<B['getState']>
-          }
-      >
-  > &
-  A &
-  ThisType<ActionHandler<A> & BaseStore<S> & S & GetterRes<G>>
+  GetterRes<G> & {
+    selector: <F extends Obj>(
+      selector?: (store: BaseStore<S> & S & GetterRes<G> & A) => RObj<F>
+    ) => Obj extends F ? BaseStore<S> & S & GetterRes<G> & A : F
+  }
+
 export declare function defineStore<S = Obj, G = Obj, A = Obj>(
   config: ModelOptions<S, G, A>
-): BaseStore<S> &
-  S &
-  GetterRes<
-    G &
-      ThisType<
-        S &
-          GetterRes<G> & {
-            $depend: <B extends Record<string, any>>(
-              store: B
-            ) => ReturnType<B['getState']>
-          }
-      >
-  > &
-  A &
-  ThisType<ActionHandler<A> & BaseStore<S> & S & GetterRes<G>>
-export declare function useStore<S extends BaseStore>(store: S): S
-export declare function useStore<
-  S extends BaseStore,
-  F extends (store: S) => any
->(store: S, selector: F): ReturnType<F>
+): Store<S, G, A>
+// export declare function useStore<S extends BaseStore>(store: S): S
+export declare function useStore<S extends BaseStore, R extends Obj>(
+  store: S,
+  selector?: (store: S) => R
+): Obj extends R ? S : R
 export {}
 /** selector, getters 依赖收集 */

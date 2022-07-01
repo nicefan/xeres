@@ -1,7 +1,7 @@
 {
   "name": "xeres",
   "description": "This is a React state manage tool",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "author": {
     "name": "nicefan",
     "email": "u-fan@outlook.com",
@@ -30,7 +30,6 @@
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-prettier": "^4.0.0",
     "prettier": "2.6.2",
-    "react": "^18.1.0",
     "rollup": "^2.75.1",
     "tsc": "^2.0.4",
     "tslib": "^2.4.0",

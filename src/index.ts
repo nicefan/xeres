@@ -44,9 +44,12 @@ function accessHelper(store, getState) {
   const changes = new Map<string, any>()
   const map = new Map()
   const handler = {
-    get(_target, key: string) {
+    get(_target, key: string, receiver) {
       const target = _target.store || _target
       const path = map.get(target) || []
+      if (!Object.prototype.hasOwnProperty.call(target, key)) {
+        return Reflect.get(target, key, receiver)
+      }
       const current = target[key]
       if (current && typeof current === 'object') {
         map.set(current, [...path, key])
@@ -59,9 +62,12 @@ function accessHelper(store, getState) {
     },
     set: (_target, key, value) => {
       const target = _target.store || _target
-      if (target[key] !== value) {
+      if (
+        target[key] !== value ||
+        (Array.isArray(target) && key === 'length')
+      ) {
         const path = [...(map.get(target) || []), key]
-        changes.set(path.join(), value)
+        changes.set(path.join(), { value, old: target[key] })
         const state = getState()
         if (target === store && Reflect.has(state, key)) {
           return Reflect.set(state, key, value)
@@ -162,7 +168,7 @@ class BaseStore<S extends Obj = Obj> {
     for (const [key, sub] of this.#getterSubscriber) {
       if (!sub.deps.length) continue
       for (const dep of sub.deps) {
-        const isDep = !!changePaths.find((path) => dep.startsWith(path)) // TODO：依赖的父元素改变，还需要对依赖的元素进行比较
+        const isDep = !!changePaths.find((path) => path.startsWith(dep)) // TODO：依赖的父元素改变，还需要对依赖的元素进行比较
         if (isDep) {
           const result = sub.updater()
           changes.set(key, result)
@@ -195,11 +201,31 @@ class BaseStore<S extends Obj = Obj> {
     const changePaths = [...changes.keys()]
     for (const sub of this.#subscribers) {
       if (sub.deps.length) {
-        for (const dep of sub.deps) {
-          const isDep = !!changePaths.find((path) => dep.startsWith(path)) // TODO：依赖的父元素改变，还需要对依赖的元素进行比较
+        for (const depPath of sub.deps) {
+          // 子元素变化，依赖的父元素都响应变化
+          const isDep = !!changePaths.find((path) => path.startsWith(depPath))
           if (isDep) {
             sub.updater(changes)
             break
+          } else {
+            // 依赖的父元素改变，对依赖的元素进行比较
+            const parent = changePaths.find((path) => depPath.startsWith(path))
+            if (parent) {
+              const endPath = depPath.substring(parent.length).split(',')
+              const { old, value } = changes.get(parent)
+              const subValue = endPath.reduce(
+                (pre, cur) => pre && pre[cur],
+                value
+              )
+              const oldValue = endPath.reduce(
+                (pre, cur) => pre && pre[cur],
+                old
+              )
+              if (subValue !== oldValue) {
+                sub.updater(changes)
+                break
+              }
+            }
           }
         }
       } else {
@@ -327,6 +353,18 @@ export function defineModel<S = Obj, G = Obj, A = Obj>(
   }
   return useModel
 }
+type Store<S, G, A> = ActionHandler<A> &
+  BaseStore<S> &
+  S &
+  GetterRes<G> & {
+    selector: <F extends Obj>(
+      selector?: (
+        store: ActionHandler<A> & BaseStore<S> & S & GetterRes<G>
+      ) => RObj<F>
+    ) => Obj extends F ? ActionHandler<A> & BaseStore<S> & S & GetterRes<G> : F
+  }
+
+type RObj<T> = [keyof T] extends never ? never : T
 
 export function defineStore<S = Obj, G = Obj, A = Obj>(
   config: ModelOptions<S, G, A>
@@ -334,25 +372,17 @@ export function defineStore<S = Obj, G = Obj, A = Obj>(
   const { state: _state } = config
   const state: S = typeof _state === 'function' ? (_state as any)() : _state
 
-  // return createModel({ ...config, state })
-  const store = new BaseStore({ ...config, state }) as ActionHandler<A> &
-    BaseStore<S> &
-    S &
-    GetterRes<G>
+  const store = new BaseStore({ ...config, state }) as Store<S, G, A>
+  store.selector = <F extends Obj>(selector?: (s: typeof store) => RObj<F>) => {
+    const [_, forceUpdate] = useReducer((d) => d + 1, 0)
+    const model = useMemo(() => (selector ? selector(store) : store), [_])
 
-  // const useStore = <T extends (model: typeof store) => any>(
-  //   selector?: T
-  // ): ReturnType<T> => {
-  //   const [_, forceUpdate] = useReducer((d) => d + 1, 0)
-  //   const model = selector ? selector(store) : store
-
-  //   useEffect(() => {
-  //     const unSubscribe = store.$subscribe(forceUpdate)
-
-  //     return unSubscribe
-  //   }, [])
-  //   return model
-  // }
+    useEffect(() => {
+      const unSubscribe = store.$subscribe(forceUpdate, selector)
+      return unSubscribe
+    }, [])
+    return model as any
+  }
 
   return store
 }
@@ -390,7 +420,7 @@ function getCollectProxy(ctx) {
         // return depend(current, (store, deps) => otherDepend.set(store, deps))
       }
       if (typeof current === 'function') return current
-      paths.delete(_path)
+      paths.delete(_path) // 监听子元素就不再监听父对象
       const path = _path ? _path + ',' + key : key
       paths.add(path)
       if (current && typeof current === 'object') {
