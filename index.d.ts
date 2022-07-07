@@ -33,16 +33,19 @@ declare type Store<S, G, A> = BaseStore<S> & S & GetterRes<G> & A
 declare type Selector<S> = <F extends Obj>(
   selector?: (store: S) => RObj<F>
 ) => Obj extends F ? S : F
-declare type RObj<T> = [keyof T] extends never ? never : T
-export declare function createModel<S, A, G = Obj>({
+declare type RObj<T> = Obj extends T ? never : T
+
+export declare function createModel<S, A, G>({
   state,
   actions,
   getters,
 }: ModelOptions<S, G, A>): InnerStore<S> & S & GetterRes<G> & A
-export declare function defineModel<S = Obj, G = Obj, A = Obj>(
+export declare function defineModel<S, G = {}, A = {}>(
   config: ModelOptions<S, G, A>
 ): (initState?: S | undefined) => Store<S, G, A>
-export declare function defineStore<S = Obj, G = Obj, A = Obj>(
+export declare function defineStore<S, G = {}, A = {}>(
   config: ModelOptions<S, G, A>
-): [Store<S, G, A>, Selector<Store<S, G, A>>]
+): Store<S, G, A> & {
+  useSelector: Selector<Store<S, G, A>>
+}
 export {}

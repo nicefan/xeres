@@ -56,11 +56,11 @@ export class Consumer {
         const getter = () => {
           let sub = this.getterSubscriber.get(key)
           if (!sub) {
-            sub = this.createSubscriber(getter)
+            sub = this.createSubscriber(item)
             this.getterSubscriber.set(key, sub)
           }
           if (sub.changeFlag) {
-            sub.result = Reflect.apply(getter, instance, [])
+            sub.result = Reflect.apply(item, instance, [])
             sub.changeFlag = false
           }
           return sub.result
@@ -148,7 +148,7 @@ export class Consumer {
         // 依赖的父元素改变，对依赖的元素进行比较
         const isParent = depPath.startsWith(path)
         if (isParent) {
-          const endPath = depPath.substring(path.length).split(',')
+          const endPath = depPath.substring(path.length + 1).split(',')
           const { old, value } = change
           const subValue = endPath.reduce((pre, cur) => pre && pre[cur], value)
           const oldValue = endPath.reduce((pre, cur) => pre && pre[cur], old)

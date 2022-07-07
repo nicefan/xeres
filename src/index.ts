@@ -50,7 +50,7 @@ interface InnerStore<S = Obj> extends BaseStore<S> {
   ) => [get: () => any, unSubscribe: Fn]
 }
 
-export function createModel<S, A, G = Obj>({
+export function createModel<S, A, G>({
   state,
   actions,
   getters,
@@ -60,27 +60,29 @@ export function createModel<S, A, G = Obj>({
   const outerSubscribers = new Set<Fn>()
   const changeList = new Map()
 
-  const instance: Obj = Object.defineProperties(
-    {},
-    {
-      /** state 访问记录器，需要对外提供 */
-      __recorder__: {
-        value: createRecorder(__state),
-      },
-      __outerSubscribe__: {
-        value: (subscribe) => outerSubscribers.add(subscribe),
-      },
-      __emitChange__: {
-        value: emitChange,
-      },
-      $subscribe: {
-        value: (...args) =>
-          Reflect.apply(consumer.registConsumer, consumer, args),
-      },
-      getState: {
-        value: () => readonlyState,
-      },
-    }
+  const instance: Obj = Object.create(
+    Object.defineProperties(
+      {},
+      {
+        /** state 访问记录器，需要对外提供 */
+        __recorder__: {
+          value: createRecorder(__state),
+        },
+        __outerSubscribe__: {
+          value: (subscribe) => outerSubscribers.add(subscribe),
+        },
+        __emitChange__: {
+          value: emitChange,
+        },
+        $subscribe: {
+          value: (...args) =>
+            Reflect.apply(consumer.registConsumer, consumer, args),
+        },
+        getState: {
+          value: () => readonlyState,
+        },
+      }
+    )
   )
 
   // 映射state
@@ -97,7 +99,7 @@ export function createModel<S, A, G = Obj>({
   const consumer = new Consumer(instance, getters)
 
   // 映射actions
-  const { actionMap } = registActions(instance, state, actions)
+  const { actionMap } = registActions(instance, __state, actions)
   // 提交变更
   function emitChange(path, value) {
     if (changeList.size === 0) {
@@ -121,16 +123,14 @@ export function createModel<S, A, G = Obj>({
   return instance as InnerStore<S> & S & GetterRes<G> & A
 }
 
-export function defineModel<S = Obj, G = Obj, A = Obj>(
-  config: ModelOptions<S, G, A>
-) {
+export function defineModel<S, G = {}, A = {}>(config: ModelOptions<S, G, A>) {
   function useModel(initState?: S) {
     const [_, forceUpdate] = useReducer((d) => d + 1, 0)
     const model = useMemo(() => {
       const instance = createModel({
         ...config,
         ...(initState && { state: initState }),
-      }) 
+      })
       instance.$subscribe(forceUpdate)
       return instance
     }, [])
@@ -142,28 +142,34 @@ export function defineModel<S = Obj, G = Obj, A = Obj>(
 
 type Store<S, G, A> = BaseStore<S> & S & GetterRes<G> & A
 
-type Selector<S> = <F extends Obj>(
-  selector?: (store: S) => RObj<F>
-) => Obj extends F ? S : F
-type RObj<T> = [keyof T] extends never ? never : T
+interface Selector<S> {
+  <F extends Obj & { call?: never }>(
+    selector?: (store: S) => RObj<F>
+  ): Obj extends F ? S : F
+}
+type RObj<T> = Obj extends T ? never : T
 
-export function defineStore<S = Obj, G = Obj, A = Obj>(
+export function defineStore<S = {}, G = {}, A = {}>(
   config: ModelOptions<S, G, A>
 ) {
   const instance = createModel(config)
 
   const useSelector: Selector<Store<S, G, A>> = (selector) => {
     const [_, forceUpdate] = useReducer((d) => d + 1, 0)
-    const [getData, unRegist] = useMemo(
+    const [getData, unRegistry] = useMemo(
       () => instance.$subscribe(forceUpdate, selector),
       []
     )
-    useEffect(() => unRegist, [])
+    useEffect(() => unRegistry, [])
 
     return getData()
   }
-
-  return [instance, useSelector] as [Store<S, G, A>, Selector<Store<S, G, A>>]
+  Object.defineProperties(instance, {
+    useSelector: { value: useSelector },
+  })
+  return instance as unknown as Store<S, G, A> & {
+    useSelector: Selector<Store<S, G, A>>
+  }
 }
 
 // export function useStore<S extends BaseStore, F extends (store: S) => any>(
