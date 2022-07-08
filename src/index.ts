@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useReducer } from 'react'
-import { createRecorder } from './getDepend'
 import { Consumer } from './getterHelper'
 import { registActions } from './setter'
 
@@ -42,9 +41,10 @@ type ModelOptions<S, G, A> = {
 
 interface BaseStore<S> {
   getState: () => Readonly<S>
+  setState: (setter: (state: S) => void) => void
 }
 interface InnerStore<S = Obj> extends BaseStore<S> {
-  $subscribe: (
+  subscribe: (
     updater: Fn<[Obj]>,
     selector?: Fn
   ) => [get: () => any, unSubscribe: Fn]
@@ -60,30 +60,7 @@ export function createModel<S, A, G>({
   const outerSubscribers = new Set<Fn>()
   const changeList = new Map()
 
-  const instance: Obj = Object.create(
-    Object.defineProperties(
-      {},
-      {
-        /** state 访问记录器，需要对外提供 */
-        __recorder__: {
-          value: createRecorder(__state),
-        },
-        __outerSubscribe__: {
-          value: (subscribe) => outerSubscribers.add(subscribe),
-        },
-        __emitChange__: {
-          value: emitChange,
-        },
-        $subscribe: {
-          value: (...args) =>
-            Reflect.apply(consumer.registConsumer, consumer, args),
-        },
-        getState: {
-          value: () => readonlyState,
-        },
-      }
-    )
-  )
+  const instance: Obj = {}
 
   // 映射state
   Object.keys(__state).forEach((key) => {
@@ -96,10 +73,11 @@ export function createModel<S, A, G>({
   })
 
   // 映射 getters
-  const consumer = new Consumer(instance, getters)
+  const consumer = new Consumer(instance, __state, getters)
 
   // 映射actions
-  const { actionMap } = registActions(instance, __state, actions)
+  const { actionMap, createAction } = registActions(instance, __state, actions)
+
   // 提交变更
   function emitChange(path, value) {
     if (changeList.size === 0) {
@@ -120,6 +98,31 @@ export function createModel<S, A, G>({
     // 如果有外部订阅，立即通知
     outerSubscribers.forEach((notify) => notify(path, value))
   }
+
+  Object.setPrototypeOf(
+    instance,
+    Object.defineProperties(
+      {},
+      {
+        __outerSubscribe__: {
+          value: (subscribe) => outerSubscribers.add(subscribe),
+        },
+        __emitChange__: {
+          value: emitChange,
+        },
+        subscribe: {
+          value: (...args) =>
+            Reflect.apply(consumer.registConsumer, consumer, args),
+        },
+        getState: {
+          value: () => readonlyState,
+        },
+        setState: {
+          value: createAction('setState'),
+        },
+      }
+    )
+  )
   return instance as InnerStore<S> & S & GetterRes<G> & A
 }
 
@@ -131,7 +134,7 @@ export function defineModel<S, G = {}, A = {}>(config: ModelOptions<S, G, A>) {
         ...config,
         ...(initState && { state: initState }),
       })
-      instance.$subscribe(forceUpdate)
+      instance.subscribe(forceUpdate)
       return instance
     }, [])
     // TODO: 清除异步action
@@ -157,7 +160,7 @@ export function defineStore<S = {}, G = {}, A = {}>(
   const useSelector: Selector<Store<S, G, A>> = (selector) => {
     const [_, forceUpdate] = useReducer((d) => d + 1, 0)
     const [getData, unRegistry] = useMemo(
-      () => instance.$subscribe(forceUpdate, selector),
+      () => instance.subscribe(forceUpdate, selector),
       []
     )
     useEffect(() => unRegistry, [])

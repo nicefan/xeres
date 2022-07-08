@@ -1,3 +1,5 @@
+import { createRecorder } from './getDepend'
+
 type SubscribInfo = {
   deps: string[]
   result?: any
@@ -12,12 +14,13 @@ export class Consumer {
   getterSubscriber = new Map<string, SubscribInfo>()
   consumerMap = new Map<Fn, SubscribInfo>()
 
-  constructor(instance, getters = {}) {
+  constructor(instance, state, getters = {}) {
     this.instance = instance
     const { outerDepends, getterMap } = this.registGetters(instance, getters)
     this.getterMap = getterMap
     const records = this.records
-    const stateProxy = instance.__recorder__(records)
+    const recorder = createRecorder(state)
+    const stateProxy = recorder(records)
 
     this.proxyCtx = new Proxy(
       {},
@@ -27,8 +30,8 @@ export class Consumer {
             return stateProxy[p]
           }
           if (outerDepends.has(p)) {
-            const outer = outerDepends.get(p)
-            return outer.__recorder__(records, p)
+            const outerRecorder = outerDepends.get(p)
+            return outerRecorder(records, p)
           }
           if (getterMap.has(p)) {
             records.add(p)
@@ -45,13 +48,16 @@ export class Consumer {
     Object.keys(getters).forEach((key) => {
       const item = getters[key]
       // 提取外部依赖
-      if (item.__recorder__) {
-        instance[key] = item.getState()
+      if (item.__outerSubscribe__) {
         item.__outerSubscribe__((path, change) => {
           const _path = path ? key + ',' + path : key
-          this.instance.__emitChange__(_path, change)
+          instance.__emitChange__(_path, change)
         })
-        outerDepends.set(key, item)
+        outerDepends.set(key, createRecorder(item.getState()))
+        Object.defineProperty(instance, key, {
+          enumerable: true,
+          get: item.getState,
+        })
       } else if (typeof item === 'function') {
         const getter = () => {
           let sub = this.getterSubscriber.get(key)

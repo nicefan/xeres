@@ -22,9 +22,10 @@ declare type ModelOptions<S, G, A> = {
 }
 interface BaseStore<S> {
   getState: () => Readonly<S>
+  setState: (setter: (state: S) => void) => void
 }
 interface InnerStore<S = Obj> extends BaseStore<S> {
-  $subscribe: (
+  subscribe: (
     updater: Fn<[Obj]>,
     selector?: Fn
   ) => [get: () => any, unSubscribe: Fn]
