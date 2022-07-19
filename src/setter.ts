@@ -60,8 +60,9 @@ export function registActions(instance, state, actions = {}) {
       value: (...args) => {
         changes.clear()
         listens.isAsync = false
-        Reflect.apply(actions[key], ctx, args)
+        const result = Reflect.apply(actions[key], ctx, args)
         listens.isAsync = true
+        return result
       },
     })
   })

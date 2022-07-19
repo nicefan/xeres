@@ -16,6 +16,7 @@ export function createContext<S extends Obj>(data: S, hook: Obj = {}) {
         case '$has':
           return (k: string) => hasOwn(target, k)
       }
+      // TODO: 数组收集依赖时，如果遍历或解构应该监听整个数组变化
       if (hasOwn(target, key)) {
         hook.getter && hook.getter(path, key, value, target)
         if (value && typeof value === 'object') {
