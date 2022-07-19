@@ -1,53 +1,74 @@
-# React Tailwindcss Boilerplate build with Vite
+# xeres
 
-This is a [ReactJS](https://reactjs.org) + [Vite](https://vitejs.dev) boilerplate to be used with [Tailwindcss](https://tailwindcss.com).
-
-## What is inside?
-
-This project uses many tools like:
-
-- [ReactJS](https://reactjs.org)
-- [Vite](https://vitejs.dev)
-- [TypeScript](https://www.typescriptlang.org)
-- [Jest](https://jestjs.io)
-- [Testing Library](https://testing-library.com)
-- [Tailwindcss](https://tailwindcss.com)
-- [Eslint](https://eslint.org)
-- [Prettier](https://prettier.io)
-
+This is a React state manager.
++ Out of the box.
++ zero configuration.
++ decentralized.
++ freely combined.
 ## Getting Started
 
+```ts
+// countStore.ts
+import { defineStore } from 'xeres'
+
+export default defineStore({
+  state: () => ({
+    name: 'world',
+    count: 0
+  }),
+  getters: {
+    welcome() {
+      return `Hello, ${this.name}`
+    }
+  },
+  actions: {
+    increment() {
+      this.count += 1
+    },
+    decrement() {
+      this.count -= 1
+    }
+  }
+})
+```
+```tsx
+import countStore from './countStore'
+
+const useCountStore = () => countStore.useSelector(store => ({
+  count: store.count,
+  welcome: store.welcome
+}))
+
+export function counter() {
+  /**
+   * // All state data changes respond.
+   * const { count, welcome } = countStore.useSelector()
+   */
+  // just responds to changes in count and welcome.
+  const { count, welcome } = useCountStore()
+  return (
+    <div>
+      <h2>{welcome}</h2>
+      <div>
+        <button onClick={countStore.increment} >
+          Increment
+        </button>
+        <span>{count}</span>
+        <button onClick={countStore.decrement} >
+          Decrement
+        </button>
+      </div>
+    </div>
+  )
+}
+```
 ### Install
 
-Install dependencies.
 
 ```bash
-npm install
+npm install xeres
 ```
 
-Serve with hot reload at http://localhost:3000.
-
-```bash
-npm run dev
-```
-
-### Lint
-
-```bash
-npm run lint
-```
-
-### Build
-
-```bash
-npm run build
-```
-
-### Test
-
-```bash
-npm run test
-```
 
 ## License
 

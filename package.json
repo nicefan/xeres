@@ -1,13 +1,13 @@
 {
   "name": "xeres",
-  "description": "This is a React state manage tool",
-  "version": "0.1.7",
+  "description": "This is a React state manager",
+  "version": "0.2.2",
   "author": {
     "name": "nicefan",
-    "email": "u-fan@outlook.com",
-    "url": "https://github.com/nicefan/xeres"
+    "email": "u-fan@outlook.com"
   },
-
+  "homepage": "https://github.com/nicefan/xeres",
+  "repository": "github:nicefan/xeres",
   "files": [
     "dist",
     "index.d.ts"
