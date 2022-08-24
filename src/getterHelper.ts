@@ -8,9 +8,10 @@ type SubscribInfo = {
 }
 export class Consumer {
   private instance: Obj
-  private proxyCtx: Obj
-  private records = new Set<string>()
+  private stateRecorder: ReturnType<typeof createRecorder>
   private getterMap: Map<string, Fn>
+  /** 外部store getter */
+  private extGetterMap: Map<string, Fn>
   getterSubscriber = new Map<string, SubscribInfo>()
   consumerMap = new Map<Fn, SubscribInfo>()
 
@@ -18,28 +19,41 @@ export class Consumer {
     this.instance = instance
     const { outerDepends, getterMap } = this.registGetters(instance, getters)
     this.getterMap = getterMap
-    const records = this.records
-    const recorder = createRecorder(state)
-    const stateProxy = recorder(records)
+    this.extGetterMap = outerDepends
+    this.stateRecorder = createRecorder(state)
+  }
 
-    this.proxyCtx = new Proxy(
+  private collectDeps(getter: Fn) {
+    const { getterMap, extGetterMap, instance } = this
+    const records = new Set<string>()
+    /** 依存其它getter */
+    const relations = new Set<string>()
+    const stateProxy = this.stateRecorder(records)
+
+    const proxyCtx = new Proxy(
       {},
       {
         get(target, p: string) {
           if (stateProxy.$has(p)) {
             return stateProxy[p]
           }
-          if (outerDepends.has(p)) {
-            const outerRecorder = outerDepends.get(p)
+          const outerRecorder = extGetterMap.get(p)
+          if (outerRecorder) {
             return outerRecorder(records, p)
           }
-          if (getterMap.has(p)) {
-            records.add(p)
+          const depGetter = getterMap.get(p)
+          if (depGetter) {
+            relations.add(p)
+            return depGetter()
           }
           return Reflect.get(instance, p, instance)
         },
       }
     )
+
+    /** 执行收集依赖 */
+    const result = Reflect.apply(getter, proxyCtx, [])
+    return { result, records, relations }
   }
 
   private registGetters(instance, getters) {
@@ -81,45 +95,27 @@ export class Consumer {
     return { getterMap, outerDepends }
   }
 
+  /** 创建一个定阅者 */
   private createSubscriber(getter): SubscribInfo {
-    const { records, proxyCtx, getterMap } = this
-    records.clear()
-    Reflect.apply(getter, proxyCtx, [])
-    const relations: string[] = []
+    /** 执行收集依赖 */
+    const { result, records, relations } = this.collectDeps(getter)
+
     records.forEach((path) => {
-      if (getterMap.has(path)) {
-        relations.push(path)
-        records.delete(path)
-      } else {
-        // depends父路径过滤
-        for (const dep of records) {
-          if (dep !== path && dep.startsWith(path)) {
-            records.delete(path)
-            break
-          }
+      // depends父路径过滤
+      for (const dep of records) {
+        if (dep !== path && dep.startsWith(path)) {
+          records.delete(path)
+          break
         }
       }
     })
     return {
       deps: [...records],
-      result: undefined,
-      changeFlag: true,
-      relations,
+      result: result?.__target__ || result,
+      changeFlag: false,
+      relations: [...relations],
     }
   }
-
-  // getGetterResult(getter, key: string) {
-  //   let sub = this.getterSubscriber.get(key)
-  //   if (!sub) {
-  //     sub = this.createSubscriber(getter)
-  //     this.getterSubscriber.set(key, sub)
-  //   }
-  //   if (sub.changeFlag) {
-  //     sub.result = Reflect.apply(getter, this.instance, [])
-  //     sub.changeFlag = false
-  //   }
-  //   return sub.result
-  // }
 
   public notify(path, change) {
     const depends: string[] = []

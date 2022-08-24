@@ -5,6 +5,12 @@ This is a React state manager.
 + zero configuration.
 + decentralized.
 + freely combined.
+### Install
+
+
+```bash
+npm install xeres
+```
 ## Getting Started
 
 ```ts
@@ -61,12 +67,6 @@ export function counter() {
     </div>
   )
 }
-```
-### Install
-
-
-```bash
-npm install xeres
 ```
 
 
