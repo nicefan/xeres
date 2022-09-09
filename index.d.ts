@@ -31,9 +31,10 @@ interface InnerStore<S = Obj> extends BaseStore<S> {
   ) => [get: () => any, unSubscribe: Fn]
 }
 declare type Store<S, G, A> = BaseStore<S> & S & GetterRes<G> & A
-declare type Selector<S> = <F extends Obj>(
-  selector?: (store: S) => RObj<F>
-) => Obj extends F ? S : F
+declare interface Selector<S> {
+  <F extends Obj>(selector: (store: S) => RObj<F>): F
+  (selector?: undefined): S
+}
 declare type RObj<T> = Obj extends T ? never : T
 
 export declare function createModel<S, A, G>({
