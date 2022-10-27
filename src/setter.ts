@@ -7,13 +7,14 @@ function getStateAccessor(state, callback) {
   return createContext(state, {
     setter(path, key, value, target) {
       let flag = true
-      if (
-        target[key] !== value ||
-        (Array.isArray(target) && key === 'length')
-      ) {
+      const isMap = target instanceof Map
+      const oldVal = isMap ? target.get(key) : target[key]
+      if (oldVal !== value || (Array.isArray(target) && key === 'length')) {
         const _path = [...path, key]
-        const result = { value, old: target[key] }
-        flag = Reflect.set(target, key, value)
+        const result = { value, old: oldVal }
+        flag = isMap
+          ? !!target.set(key, value)
+          : Reflect.set(target, key, value)
         if (flag) {
           callback(_path, result)
         }
@@ -36,9 +37,9 @@ function accessor(instance, state, callback) {
       },
     }
   )
-
   return ctx
 }
+
 export function registActions(instance, state, actions = {}) {
   const actionMap = new Map<string, ActionInfo>()
 
@@ -49,6 +50,9 @@ export function registActions(instance, state, actions = {}) {
       // 通知更新
       const pathStr = path.join()
       instance.__emitChange__(pathStr, value)
+      if (changes.has(pathStr)) {
+        value.old = changes.get(pathStr).old
+      }
       changes.set(pathStr, value)
     })
     const listens = {
@@ -73,6 +77,9 @@ export function registActions(instance, state, actions = {}) {
       // 通知更新
       const pathStr = path.join()
       instance.__emitChange__(pathStr, value)
+      if (changes.has(pathStr)) {
+        value.old = changes.get(pathStr).old
+      }
       changes.set(pathStr, value)
     })
     const listens = {

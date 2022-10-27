@@ -83,7 +83,7 @@ export function createModel<S, A, G>({
     if (changeList.size === 0) {
       Promise.resolve().then(() => {
         consumer.consumerMap.forEach((sub, updater) => {
-          sub.changeFlag && updater()
+          sub.changeFlag && updater([...changeList])
         })
 
         // TODO:查找改变来自哪些action生成操作记录对接redux

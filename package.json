@@ -1,7 +1,7 @@
 {
   "name": "xeres",
   "description": "This is a React state manager",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "author": {
     "name": "nicefan",
     "email": "u-fan@outlook.com"
@@ -16,6 +16,9 @@
   "module": "./dist/index.js",
   "types": "./index.d.ts",
   "scripts": {
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
     "build": "rollup -c"
   },
   "devDependencies": {
@@ -26,13 +29,17 @@
     "@types/react": "^18.0.9",
     "@typescript-eslint/eslint-plugin": "^5.26.0",
     "@typescript-eslint/parser": "^5.26.0",
+    "@vitest/ui": "^0.24.0",
     "eslint": "^8.16.0",
     "eslint-config-prettier": "^8.5.0",
     "eslint-plugin-prettier": "^4.0.0",
     "prettier": "2.6.2",
+    "react": "^18.2.0",
     "rollup": "^2.75.1",
     "tsc": "^2.0.4",
     "tslib": "^2.4.0",
-    "typescript": "^4.7.2"
+    "typescript": "^4.7.2",
+    "vite": "^3.1.6",
+    "vitest": "^0.24.0"
   }
 }
