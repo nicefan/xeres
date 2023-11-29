@@ -3,26 +3,18 @@ type ActionInfo = {
   changes: Map<string, { value: any; old: any }>
   isAsync: boolean
 }
+
 function getStateAccessor(state, callback) {
   return createContext(state, {
-    setter(path, key, value, target) {
-      let flag = true
-      const isMap = target instanceof Map
-      const oldVal = isMap ? target.get(key) : target[key]
-      if (oldVal !== value || (Array.isArray(target) && key === 'length')) {
-        const _path = [...path, key]
-        const result = { value, old: oldVal }
-        flag = isMap
-          ? !!target.set(key, value)
-          : Reflect.set(target, key, value)
-        if (flag) {
-          callback(_path, result)
-        }
-      }
-      return flag
+    setter(paths, key, result, target) {
+      paths.forEach((path) => {
+        const _path = path ? [...path.split(','), key] : [key]
+        callback(_path, result)
+      })
     },
   })
 }
+
 function accessor(instance, state, callback) {
   const stateProxy = getStateAccessor(state, callback)
   const ctx = new Proxy(

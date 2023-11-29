@@ -1,5 +1,5 @@
 dist
-dist-ssr
+dist_types
 *.local
 
 # dependencies

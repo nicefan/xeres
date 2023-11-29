@@ -23,7 +23,7 @@ export class Consumer {
     this.stateRecorder = createRecorder(state)
   }
 
-  private collectDeps(getter: Fn) {
+  private collectDeps(getter: Fn<any, any>) {
     const { getterMap, extGetterMap, instance } = this
     const records = new Set<string>()
     /** 依存其它getter */
@@ -111,7 +111,7 @@ export class Consumer {
     })
     return {
       deps: [...records],
-      result: result?.__target__ || result,
+      result: result && (result.__target__ || result),
       changeFlag: false,
       relations: [...relations],
     }

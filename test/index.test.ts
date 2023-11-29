@@ -19,25 +19,32 @@ const model = createModel({
   state: {
     num: 0,
     cls: new MyClass(),
+    obj: { x: 'x' },
     date: new Date(),
     setObj: new Set(),
     mapObj: new Map<any, any>(),
-    arr: ['a', 'b', 'c', 'd'],
+    arr: [{name:'a'},{ name: 'b'}, 'c', {name:'d'}],
   },
   actions: {
     count() {
       // this.num += 1
-      // this.del()
+      this.del()
       this.setObj = new Set(['a'])
-      this.mapObj.set(bj, { t: 't' })
+      this.obj.x = 'x'
+      // this.mapObj.set(bj, { t: 't' })
       this.mapObj.set('a', { k: 'ax' })
       new Promise(resolve => setTimeout(resolve, 10)).then(() => {
-        this.date = new Date()
+        // this.date = new Date()
         this.cls.val = String(this.num)
         this.setObj.add(this.num)
         const abc = this.mapObj.get('a')
+        // this.mapObj.set(this.date, this.num)
+        this.arr.push(abc)
+        delete this.obj.b
+
+        // this.arr[0].name = 'abc'
         abc.k = 'ax3'
-        this.mapObj.set(this.date, this.num)
+        console.log(this.arr)
       })
     },
     del() {

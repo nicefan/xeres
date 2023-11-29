@@ -1,8 +1,11 @@
-import path from 'path'
+// import path from 'path'
 // import { terser } from 'rollup-plugin-terser';
 // import resolve from '@rollup/plugin-node-resolve'
 // import commonjs from '@rollup/plugin-commonjs'
+import { readFileSync } from 'node:fs'
 import ts from '@rollup/plugin-typescript'
+import dts from 'rollup-plugin-dts'
+const global = readFileSync(new URL('./src/types.d.ts', import.meta.url))
 
 const pkg = require('./package.json')
 // const name = pkg.name
@@ -14,15 +17,16 @@ const banner = `/*!
   */`
 
 const tsPlugin = ts({
-  lib: ['esnext'],
-  target: 'es2015',
-  declaration: false,
-  outDir: dir,
-  // declarationDir: dir + '/types',
+  compilerOptions:{
+    lib: ['esnext'],
+    target: 'es2015',
+    outDir: dir,
+    declaration: false,
+    declarationDir: 'dist_types',
+  },
   // check: true,
-  tsconfig: path.resolve(__dirname, 'tsconfig.json'),
-  // cacheRoot: path.resolve(__dirname, 'node_modules/.rts2_cache'),
-  // tsconfigOverride: { compilerOptions: { declaration: false,declarationMap: false } }
+  tsconfig: './tsconfig.json',
+  include: ['src/*'],
 })
 const mainFile = 'src/index.ts'
 const mainConfig = {
@@ -31,15 +35,27 @@ const mainConfig = {
     {
       banner,
       format: 'cjs',
-      file: pkg.main,
+      dir: '.',
+      entryFileNames: dir + '/[name].cjs',
     },
     {
       banner,
       format: 'es',
-      file: pkg.module,
+      dir: '.',
+      entryFileNames: dir + '/[name].js',
     },
   ],
   plugins: [tsPlugin],
 }
 
-export default mainConfig
+const types = {
+  input: mainFile,
+  output: {
+    intro: global,
+    format: 'es',
+    dir: '.',
+    entryFileNames: dir + '/[name].d.ts',
+  },
+  plugins: [dts()],
+}
+export default [mainConfig, types]
