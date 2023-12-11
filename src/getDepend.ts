@@ -95,6 +95,7 @@ export function createContext<S extends Obj>(
       deleteProperty: function (target, prop) {
         const paths: string[] = getRefPaths(path.toString())
         const result = { value: undefined, old: target[prop] }
+        delete target[prop]
         if (result.old !== undefined && setter)
           setter(paths, prop, result, target)
         return true

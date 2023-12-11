@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs'
 import ts from '@rollup/plugin-typescript'
 import dts from 'rollup-plugin-dts'
-const global = readFileSync(new URL('./src/types.d.ts', import.meta.url))
+// const global = readFileSync(new URL('./src/types.d.ts', import.meta.url))
 
 const pkg = require('./package.json')
 // const name = pkg.name
@@ -36,7 +36,7 @@ const mainConfig = {
       banner,
       format: 'cjs',
       dir: '.',
-      entryFileNames: dir + '/[name].cjs',
+      entryFileNames: dir + '/[name].cjs.js',
     },
     {
       banner,
@@ -51,7 +51,7 @@ const mainConfig = {
 const types = {
   input: mainFile,
   output: {
-    intro: global,
+    // intro: global,
     format: 'es',
     dir: '.',
     entryFileNames: dir + '/[name].d.ts',

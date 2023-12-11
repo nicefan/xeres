@@ -19,7 +19,7 @@ const model = createModel({
   state: {
     num: 0,
     cls: new MyClass(),
-    obj: { x: 'x' },
+    obj: { x: 'x', b: 'b' },
     date: new Date(),
     setObj: new Set(),
     mapObj: new Map<any, any>(),
@@ -44,7 +44,7 @@ const model = createModel({
 
         // this.arr[0].name = 'abc'
         abc.k = 'ax3'
-        console.log(this.arr)
+        console.log(this.obj)
       })
     },
     del() {
