@@ -25,9 +25,12 @@ const setMethod = (target, key, value) => {
 
 function deepGet(target: Obj, paths: string[]) {
   let result = target
-  paths.forEach((key) => {
+  for (const key of paths) {
     result = isMapSet(result) ? result.get(key) : result[key]
-  })
+    if (!result) {
+      return
+    }
+  }
   return result
 }
 
@@ -64,7 +67,7 @@ export function createContext<S extends Obj>(
               const oldVal = target.size
               target[key](...arg)
               const result = { value: target.size, old: oldVal }
-              const paths: string[] = getRefPaths(path.toString())
+              const paths: string[] = getRefPaths(target)
               setter && setter(paths, 'size', result, target)
             }
           } else if (key === 'set') {
@@ -93,7 +96,7 @@ export function createContext<S extends Obj>(
         return Reflect.get(target, key, receiver)
       },
       deleteProperty: function (target, prop) {
-        const paths: string[] = getRefPaths(path.toString())
+        const paths: string[] = getRefPaths(target)
         const result = { value: undefined, old: target[prop] }
         delete target[prop]
         if (result.old !== undefined && setter)
@@ -107,7 +110,7 @@ export function createContext<S extends Obj>(
         }
 
         const isMap = isMapSet(target)
-        const paths: string[] = getRefPaths(path.toString())
+        const paths: string[] = getRefPaths(target)
         const sizeField = Array.isArray(target) ? 'length' : isMap ? 'size' : ''
         const oldSize = target[sizeField]
         const oldVal = !isMapSet(target) ? target[key] : target.get(key)
@@ -133,18 +136,17 @@ export function createContext<S extends Obj>(
   }
 
   /** 递归获取所有引用对象路径 */
-  const getRefPaths = (_parentStr, _subs?: string[]) => {
-    if (!_parentStr) return ['']
-    const parent = deepGet(data, _parentStr.split(','))
-    const ref = subMap.get(parent) as ContextMapItem
+  const getRefPaths = (target, _subs?: string[]) => {
+    if (!target) return ['']
+    const ref = subMap.get(target) as ContextMapItem
     // 遍历父对象所有引用路径
     const pathMap = new Map<string, string[]>()
     for (const p of ref.paths) {
-      if (deepGet(data, p.split(',')) !== parent) {
+      const arr = p.split(',')
+      if (deepGet(data, arr) !== target) {
         // 如果关联路径上的实际对象已经不是当前对象时，清理掉
         ref.paths.delete(p)
       } else {
-        const arr = p.split(',')
         const end = arr.splice(-1, 1)[0]
         const pre = arr.toString() || 'root'
         const newSubs = pathMap.get(pre) || []
@@ -161,7 +163,8 @@ export function createContext<S extends Obj>(
       if (_key === 'root') {
         paths = paths.concat(_subs)
       } else {
-        paths = paths.concat(getRefPaths(_key, _subs))
+        const parent = deepGet(data, _key.split(','))
+        paths = paths.concat(getRefPaths(parent, _subs))
       }
     }
     return [...new Set(paths)]
